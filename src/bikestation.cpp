@@ -1,10 +1,10 @@
 #include "bikestation.h"
-
-
+#include "bikinginterface.h"
 #include <QMutex>
 #include <QWaitCondition>
 
 BikeStation::BikeStation(int _capacity) : capacity(_capacity) {}
+extern BikingInterface* binkingInterface;
 
 BikeStation::~BikeStation() {
     ending();
@@ -34,13 +34,6 @@ void BikeStation::putBike(Bike* _bike){
     // reveille pour mette un velo
     condPutters.wakeOne();
 
-    // update de l'interface
-    for (size_t i = 0; i < globalStations->size(); ++i) {
-        if ((*globalStations)[i] == this) {
-            bikingInterface->setBikes(static_cast<unsigned int>(i), this->nbBikes());
-            break;
-        }
-    }
 }
 
 Bike* BikeStation::getBike(size_t _bikeType)
@@ -66,16 +59,6 @@ Bike* BikeStation::getBike(size_t _bikeType)
     // 2. On réveille aussi un éventuel autre preneur du même type
     //     (même si c'est vide maintenant → il se rendormira grâce au while → correct en Mesa)
     condTakers[_bikeType].wakeOne();
-
-    // === Mise à jour GUI via la variable globale du main (sans toucher au main) ===
-    if (globalStations && bikingInterface) {
-        for (size_t i = 0; i < globalStations->size(); ++i) {
-            if ((*globalStations)[i] == this) {
-                bikingInterface->setBikes(static_cast<unsigned int>(i), nbBikes());
-                break;
-            }
-        }
-    }
 
     return bike;
 }

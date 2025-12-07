@@ -6,7 +6,6 @@
 #include <QWaitCondition>
 #include <QMutex>
 #include <queue>
-#include "bikinginterface.h"
 
 #include "bike.h"
 
@@ -125,7 +124,6 @@ private:
     QWaitCondition condPutters;                                     // pour les rendeurs
     std::array<std::deque<Bike*>, Bike::nbBikeTypes> bikesByType;
     bool shouldEnd = false;
-    BikingInterface* bikingInterface;
 };
 
 #endif // BIKESTATION_H
