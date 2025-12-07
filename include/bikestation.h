@@ -3,9 +3,12 @@
 
 #include <vector>
 #include <array>
-#include <QWaitCondition>
-#include <QMutex>
+#include <deque>
 #include <queue>
+#include <mutex>
+
+#include <pcosynchro/pcomutex.h>
+#include <pcosynchro/pcoconditionvariable.h>
 
 #include "bike.h"
 
@@ -118,11 +121,10 @@ private:
      */
     const size_t capacity;
 
-    size_t _nbBikes;
-    mutable QMutex mutex;                                           // ← Qt
-    QWaitCondition condTakers[Bike::nbBikeTypes];                   // une par type
-    QWaitCondition condPutters;                                     // pour les rendeurs
-    std::vector<std::vector<Bike*>> bikesByType;
+    mutable PcoMutex mutex;                             // PcoSynchro
+    PcoConditionVariable condTakers[Bike::nbBikeTypes]; // une par type
+    PcoConditionVariable condPutters;                   // pour les rendeurs
+    std::vector<std::deque<Bike*>> bikesByType;         // deque for FIFO ordering
     bool shouldEnd = false;
 };
 
