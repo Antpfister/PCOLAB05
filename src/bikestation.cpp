@@ -1,5 +1,9 @@
 #include "bikestation.h"
 
+
+#include <QMutex>
+#include <QWaitCondition>
+
 BikeStation::BikeStation(int _capacity) : capacity(_capacity) {}
 
 BikeStation::~BikeStation() {
@@ -8,11 +12,72 @@ BikeStation::~BikeStation() {
 
 void BikeStation::putBike(Bike* _bike){
     // TODO: implement this method
+    // index par rapport au type du velo pour bikesbytype et condtakers
+    size_t t = _bike->bikeType;
+
+    // mutex
+    QMutexLocker locker(&mutex);                                // ← remplace unique_lock
+
+    // boucle condition mesa
+    while (!shouldEnd && nbBikes() >= capacity) {
+        // condputter libère le mutex et attends un waitone
+        condPutters.wait(&mutex);                           // ← wait Qt
+    }
+    // variable pour annuler l'action en cours
+    if (shouldEnd) return;
+
+    // place velo par type
+    bikesByType[t].push_back(_bike);
+
+    // reveille pour prendre un velo avec le même type
+    condTakers[t].wakeOne();
+    // reveille pour mette un velo
+    condPutters.wakeOne();
+
+    // update de l'interface
+    for (size_t i = 0; i < globalStations->size(); ++i) {
+        if ((*globalStations)[i] == this) {
+            bikingInterface->setBikes(static_cast<unsigned int>(i), this->nbBikes());
+            break;
+        }
+    }
 }
 
-Bike* BikeStation::getBike(size_t _bikeType) {
-    // TODO: implement this method
-    return nullptr;
+Bike* BikeStation::getBike(size_t _bikeType)
+{
+    QMutexLocker locker(&mutex);
+
+    // Attente tant qu'il n'y a pas de vélo du type demandé ET que la simulation n'est pas terminée
+    while (!shouldEnd && bikesByType[_bikeType].empty()) {
+        condTakers[_bikeType].wait(&mutex);   // ← Mesa + Qt
+    }
+
+    // Si la simulation est terminée → on sort proprement
+    if (shouldEnd) return nullptr;
+
+    // On prend le vélo (le premier arrivé = FIFO grâce à std::deque)
+    Bike* bike = bikesByType[_bikeType].front();
+    bikesByType[_bikeType].pop_front();
+
+    // === Réveils obligatoires (Mesa style) ===
+    // 1. On a libéré une place → quelqu’un peut rendre un vélo
+    condPutters.wakeOne();
+
+    // 2. On réveille aussi un éventuel autre preneur du même type
+    //     (même si c'est vide maintenant → il se rendormira grâce au while → correct en Mesa)
+    condTakers[_bikeType].wakeOne();
+
+    // === Mise à jour GUI via la variable globale du main (sans toucher au main) ===
+    if (globalStations && bikingInterface) {
+        for (size_t i = 0; i < globalStations->size(); ++i) {
+            if ((*globalStations)[i] == this) {
+                bikingInterface->setBikes(static_cast<unsigned int>(i), nbBikes());
+                break;
+            }
+        }
+    }
+
+    return bike;
 }
 
 std::vector<Bike*> BikeStation::addBikes(std::vector<Bike*> _bikesToAdd) {

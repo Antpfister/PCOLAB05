@@ -2,8 +2,12 @@
 #define BIKESTATION_H
 
 #include <vector>
-#include <deque>
 #include <array>
+#include <QWaitCondition>
+#include <QMutex>
+#include <queue>
+#include "bikinginterface.h"
+
 #include "bike.h"
 
 /**
@@ -114,6 +118,14 @@ private:
      * @brief Maximum number of bikes that can be stored in this station.
      */
     const size_t capacity;
+
+    size_t _nbBikes;
+    mutable QMutex mutex;                                           // ← Qt
+    QWaitCondition condTakers[Bike::nbBikeTypes];                   // une par type
+    QWaitCondition condPutters;                                     // pour les rendeurs
+    std::array<std::deque<Bike*>, Bike::nbBikeTypes> bikesByType;
+    bool shouldEnd = false;
+    BikingInterface* bikingInterface;
 };
 
 #endif // BIKESTATION_H
