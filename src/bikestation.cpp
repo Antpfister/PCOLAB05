@@ -78,14 +78,81 @@ Bike* BikeStation::getBike(size_t _bikeType)
 }
 
 std::vector<Bike*> BikeStation::addBikes(std::vector<Bike*> _bikesToAdd) {
-    std::vector<Bike*> result; // Can be removed, it's just to avoid a compiler warning
-    // TODO: implement this method
+    std::vector<Bike*> result;
+    
+    mutex.lock();
+    
+    // try to add each bike from the vector
+    for (Bike* bike : _bikesToAdd) {
+        if (shouldEnd) {
+            result.push_back(bike);
+            continue;
+        }
+        
+        // wait if station is full
+        // NOTE: we calculate total bikes here instead of calling nbBikes() to
+        // avoid deadlock since we already hold the mutex
+        while (!shouldEnd) {
+            size_t total = 0;
+            for (const auto& bikes : bikesByType) {
+                total += bikes.size();
+            }
+            if (total < capacity) break;
+            
+            // wait for space to become available
+            condPutters.wait(&mutex);
+        }
+        
+        // if simulation ended while waiting, add bike to result
+        if (shouldEnd) {
+            result.push_back(bike);
+            continue;
+        }
+        
+        size_t t = bike->bikeType;
+        bikesByType[t].push_back(bike);
+        
+        // wake waiting threads
+        condTakers[t].notifyOne();  // wake someone waiting for this type
+        condPutters.notifyOne();    // wake someone waiting to put a bike
+    }
+    
+    mutex.unlock();
     return result;
 }
 
 std::vector<Bike*> BikeStation::getBikes(size_t _nbBikes) {
-    std::vector<Bike*> result; // Can be removed, it's just to avoid a compiler warning
-    // TODO: implement this method
+    std::vector<Bike*> result;
+    
+    mutex.lock();
+    
+    // track which types we took from (for waking appropriate threads)
+    bool tookFromType[Bike::nbBikeTypes] = { false };
+    
+    // take bikes in order of type (0, 1, 2...) and FIFO within each type
+    for (size_t type = 0; type < Bike::nbBikeTypes && result.size() < _nbBikes; ++type) {
+        while (!bikesByType[type].empty() && result.size() < _nbBikes) {
+            Bike* bike = bikesByType[type].front();
+            bikesByType[type].pop_front();
+            result.push_back(bike);
+            tookFromType[type] = true;
+        }
+    }
+    
+    // wake waiting threads if we took any bikes
+    if (!result.empty()) {
+        // wake putters (we freed up space)
+        condPutters.notifyAll();
+        
+        // wake takers for each type we took from
+        for (size_t type = 0; type < Bike::nbBikeTypes; ++type) {
+            if (tookFromType[type]) {
+                condTakers[type].notifyOne();
+            }
+        }
+    }
+    
+    mutex.unlock();
     return result;
 }
 
