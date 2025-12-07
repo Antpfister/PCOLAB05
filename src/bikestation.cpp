@@ -50,7 +50,7 @@ Bike* BikeStation::getBike(size_t _bikeType)
 
     // On prend le vélo (le premier arrivé = FIFO grâce à std::deque)
     Bike* bike = bikesByType[_bikeType].front();
-    bikesByType[_bikeType].pop_front();
+    bikesByType[_bikeType].pop_back();
 
     // === Réveils obligatoires (Mesa style) ===
     // 1. On a libéré une place → quelqu’un peut rendre un vélo
@@ -77,12 +77,12 @@ std::vector<Bike*> BikeStation::getBikes(size_t _nbBikes) {
 
 size_t BikeStation::countBikesOfType(size_t type) const {
     // TODO: implement this method
-    return 0;
+    return bikesByType[type].size();
 }
 
 size_t BikeStation::nbBikes() {
     // TODO: implement this method
-    return 0;
+    return _nbBikes;
 }
 
 size_t BikeStation::nbSlots() {

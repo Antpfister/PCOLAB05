@@ -122,7 +122,7 @@ private:
     mutable QMutex mutex;                                           // ← Qt
     QWaitCondition condTakers[Bike::nbBikeTypes];                   // une par type
     QWaitCondition condPutters;                                     // pour les rendeurs
-    std::array<std::deque<Bike*>, Bike::nbBikeTypes> bikesByType;
+    std::vector<std::vector<Bike*>> bikesByType;
     bool shouldEnd = false;
 };
 
