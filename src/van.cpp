@@ -49,7 +49,22 @@ void Van::driveTo(unsigned int _dest) {
 void Van::loadAtDepot() {
     driveTo(DEPOT_ID);
 
-    // TODO: implement this method. If possible, load at least 2 bikes
+    cargo.clear();
+
+    BikeStation* depot = stations[DEPOT_ID];
+
+    // A = min(2, D)
+    size_t D = depot->nbBikes();
+    size_t toLoad = std::min((size_t)2, D);
+
+    if (toLoad > 0) {
+        // getBikes respecte l'ordre FIFO et réveille les bons threads
+        std::vector<Bike*> loaded = depot->getBikes(toLoad);
+
+        for (Bike* b : loaded) {
+            cargo.push_back(b);
+        }
+    }
 
     if (binkingInterface) {
         binkingInterface->setBikes(DEPOT_ID, stations[DEPOT_ID]->nbBikes());
@@ -59,18 +74,102 @@ void Van::loadAtDepot() {
 
 void Van::balanceSite(unsigned int _site)
 {
-    // TODO: implement this method
+    if (_site == DEPOT_ID) return;
+
+    BikeStation* st = stations[_site];
+
+    unsigned int target = BORNES - 2;   // objectif : B − 2 vélos à chaque site
+    unsigned int Vi = st->nbBikes();
+    unsigned int a = cargo.size();               // capacité actuelle dans la camionnette
+
+    // vélos dans la camionnette
+
+    //
+    // ====== CAS 1 : SURPLUS → enlever des vélos du site ======
+    //
+    if (Vi > target) {
+        unsigned int surplus = Vi - target;
+        unsigned int freeSpace = VAN_CAPACITY - a;
+        unsigned int c = std::min(surplus, freeSpace);
+
+        if (c > 0) {
+            std::vector<Bike*> taken = st->getBikes(c);
+            for (Bike* b : taken)
+                cargo.push_back(b);
+        }
+    }
+
+    //
+    // ====== CAS 2 : MANQUE → déposer des vélos ======
+    //
+    else if (Vi < target) {
+
+        unsigned int needed = target - Vi;
+        unsigned int a = cargo.size();
+        unsigned int c = std::min(needed, a);
+
+        std::vector<Bike*> toAdd;
+        toAdd.reserve(c);
+
+        unsigned int deposited = 0;
+
+        //
+        // 2b.1 — Déposer en priorité 1 vélo de CHAQUE TYPE MANQUANT
+        //
+        for (size_t t = 0; t < Bike::nbBikeTypes && deposited < c; ++t) {
+
+            // TYPE MANQUANT ? (conformément au cahier des charges)
+            if (st->countBikesOfType(t) == 0) {
+
+                Bike* chosen = takeBikeFromCargo(t);
+
+                if (chosen) {
+                    toAdd.push_back(chosen);
+                    deposited++;
+                }
+            }
+        }
+
+        //
+        // 2b.2 — Compléter avec n’importe quels vélos restants dans la camionnette
+        //
+        while (deposited < c && !cargo.empty()) {
+            Bike* b = cargo.back();
+            cargo.pop_back();
+            toAdd.push_back(b);
+            deposited++;
+        }
+
+        //
+        // Dépôt des vélos dans le moniteur
+        //
+        if (!toAdd.empty()) {
+            std::vector<Bike*> rejected = st->addBikes(toAdd);
+
+            // Les vélos non déposés (fin de simulation) retournent dans le cargo
+            for (Bike* b : rejected)
+                cargo.push_back(b);
+        }
+    }
+
     if (binkingInterface) {
-        binkingInterface->setBikes(DEPOT_ID, stations[DEPOT_ID]->nbBikes()); // Keep somewhere for GUI
+        binkingInterface->setBikes(_site, st->nbBikes());
+        binkingInterface->setBikes(DEPOT_ID, stations[DEPOT_ID]->nbBikes());
     }
 }
 
 void Van::returnToDepot() {
     driveTo(DEPOT_ID);
 
-    size_t cargoCount = cargo.size();
+    BikeStation* depot = stations[DEPOT_ID];
 
-    // TODO: implement this method. If the van carries bikes, then leave them
+    if (!cargo.empty()) {
+        // addBikes peut renvoyer certains vélos si shouldEnd est true
+        std::vector<Bike*> rejected = depot->addBikes(cargo);
+
+        // Les vélos qui n'ont pas pu être ajoutés doivent rester dans le cargo
+        cargo = rejected;
+    }
 
     if (binkingInterface) {
         binkingInterface->setBikes(DEPOT_ID, stations[DEPOT_ID]->nbBikes());
