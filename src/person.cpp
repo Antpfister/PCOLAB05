@@ -27,26 +27,63 @@ void Person::setInterface(BikingInterface* _binkingInterface) {
 
 
 void Person::run() {
-    // TODO: implement this method
+    // infinite loop: take bike -> ride -> deposit -> walk -> repeat
+    while (true) {
+        // 1. take a bike of preferred type from current site
+        Bike* bike = takeBikeFromSite(currentSite);
+        if (!bike) {
+            // simulation is ending, exit cleanly
+            log(QString("Person %1: simulation ending, exiting").arg(id));
+            return;
+        }
+        
+        // 2. ride to a different site j
+        unsigned int siteJ = chooseOtherSite(currentSite);
+        bikeTo(siteJ, bike);
+        
+        // 3. deposit the bike at site j
+        depositBikeAtSite(siteJ, bike);
+        
+        // 4. walk to another site k (different from j)
+        unsigned int siteK = chooseOtherSite(siteJ);
+        walkTo(siteK);
+        
+        // 5. update current site (i <- k)
+        // NOTE: walkTo() already updates currentSite, but we're explicit here
+        // for clarity according to the instructions
+    }
 }
 
 Bike* Person::takeBikeFromSite(unsigned int _site) {
-    Bike * bike = nullptr; // just to silence compiler warnings
-    // TODO: implement this method
-
+    // get bike of preferred type from the station
+    Bike* bike = stations[_site]->getBike(preferredType);
+    
+    if (!bike) {
+        return nullptr;
+    }
+    
+    // update GUI with new bike count
     if (binkingInterface) {
         binkingInterface->setBikes(_site, stations[_site]->nbBikes());
     }
-
+    
+    log(QString("Person %1: took bike type %2 from site %3")
+        .arg(id).arg(preferredType).arg(_site));
+    
     return bike;
 }
 
 void Person::depositBikeAtSite(unsigned int _site, Bike* _bike) {
-    // TODO: implement this method
-
+    // deposit the bike at the station (waits if station is full)
+    stations[_site]->putBike(_bike);
+    
+    // update GUI with new bike count
     if (binkingInterface) {
         binkingInterface->setBikes(_site, stations[_site]->nbBikes());
     }
+    
+    log(QString("Person %1: deposited bike at site %2")
+        .arg(id).arg(_site));
 }
 
 void Person::bikeTo(unsigned int _dest, Bike* _bike) {
