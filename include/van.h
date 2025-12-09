@@ -131,6 +131,11 @@ private:
      * @brief Shared array of bike stations for all sites and the depot.
      */
     static std::array<BikeStation*, NB_SITES_TOTAL> stations;
+
+    static bool stopVanRequested;
+
 };
+
+
 
 #endif // VAN_H

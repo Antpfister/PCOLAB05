@@ -3,13 +3,16 @@
 BikingInterface* Van::binkingInterface = nullptr;
 std::array<BikeStation*, NB_SITES_TOTAL> Van::stations{};
 
+bool Van::stopVanRequested = false;
+
 Van::Van(unsigned int _id)
     : id(_id),
     currentSite(DEPOT_ID)
 {}
 
+
 void Van::run() {
-    while (true /*TODO: clean stop*/) {
+     while (!stopVanRequested) {
         loadAtDepot();
         for (unsigned int s = 0; s < NBSITES; ++s) {
             driveTo(s);
@@ -103,33 +106,26 @@ void Van::balanceSite(unsigned int _site)
     // ====== CAS 2 : MANQUE → déposer des vélos ======
     //
     else if (Vi < target) {
-
         unsigned int needed = target - Vi;
         unsigned int a = cargo.size();
         unsigned int c = std::min(needed, a);
 
         std::vector<Bike*> toAdd;
         toAdd.reserve(c);
-
         unsigned int deposited = 0;
-
         //
         // 2b.1 — Déposer en priorité 1 vélo de CHAQUE TYPE MANQUANT
         //
         for (size_t t = 0; t < Bike::nbBikeTypes && deposited < c; ++t) {
-
             // TYPE MANQUANT ? (conformément au cahier des charges)
             if (st->countBikesOfType(t) == 0) {
-
                 Bike* chosen = takeBikeFromCargo(t);
-
                 if (chosen) {
                     toAdd.push_back(chosen);
                     deposited++;
                 }
             }
         }
-
         //
         // 2b.2 — Compléter avec n’importe quels vélos restants dans la camionnette
         //
@@ -168,7 +164,13 @@ void Van::returnToDepot() {
         std::vector<Bike*> rejected = depot->addBikes(cargo);
 
         // Les vélos qui n'ont pas pu être ajoutés doivent rester dans le cargo
-        cargo = rejected;
+        if (rejected.size() == cargo.size()) {
+            // Mode shutdown détecté
+            stopVanRequested = true;
+            return; // Le run() détectera stopVanRequested et sortira de la boucle
+        }
+
+        cargo.clear();
     }
 
     if (binkingInterface) {

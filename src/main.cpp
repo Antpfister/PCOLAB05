@@ -23,9 +23,13 @@
 std::array<BikeStation*, NB_SITES_TOTAL>* globalStations = nullptr;
 std::vector<std::unique_ptr<PcoThread>>* globalThreads = nullptr;
 
+
+
 // Should stop all threads and release waiting ones
 void stopSimulation() {
-    // TODO: implement this function
+    for (BikeStation* st : *globalStations)
+        st->ending();
+    // TODO
 }
 
 
